@@ -1,4 +1,5 @@
-import type { NestingResult, WoodworkingProject } from '../types/woodworking';
+import type { CutTask, NestingResult, ReviewRecord, WoodworkingProject } from '../types/woodworking';
+import { taskPieces, taskProgress } from './cutTasks';
 import { formatArea } from './nesting';
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -57,6 +58,63 @@ export function downloadCutList(project: WoodworkingProject) {
     .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
     .join('\n');
   downloadBlob(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }), `${project.name}-零件表.csv`);
+}
+
+const csvTime = (timestamp: number) =>
+  new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
+
+/** 开料进度单：已切、待切、差异与页面共用同一份任务记录 */
+export function downloadCutProgress(task: CutTask, reviewLog: ReviewRecord[]) {
+  const progress = taskProgress(task);
+  const signedByKey = new Map(task.signoffs.map((record) => [record.pieceKey, record]));
+  const rows: Array<Array<string | number>> = [
+    ['开料任务', `${task.code}（第 ${task.seq} 版）`],
+    ['登记工位', task.workstation],
+    ['发起时间', csvTime(task.createdAt)],
+    ['冻结参数', `锯缝 ${task.snapshot.kerf} mm · 修边 ${task.snapshot.trim} mm`],
+    [],
+    ['已切', '待切', '差异（未排入）', '交付需求'],
+    [progress.cut, progress.pending, progress.diff, progress.required],
+    [],
+    ['编号', '零件', '板材', '板张', '长(mm)', '宽(mm)', '厚(mm)', '状态', '签收工位', '签收时间'],
+    ...taskPieces(task).map((piece) => {
+      const record = signedByKey.get(piece.key);
+      return [
+        `${task.code}-${piece.no}`,
+        piece.part?.name ?? piece.key,
+        piece.stock?.name ?? '',
+        `第 ${piece.placement.sheetIndex + 1} 张`,
+        piece.placement.width,
+        piece.placement.height,
+        piece.part?.thickness ?? '',
+        record ? '已切' : '待切',
+        record?.workstation ?? '',
+        record ? csvTime(record.signedAt) : '',
+      ];
+    }),
+  ];
+  if (reviewLog.length > 0) {
+    rows.push(
+      [],
+      ['复核保留记录（旧尺寸，不计入当前清单）'],
+      ['任务', '编号', '零件', '长(mm)', '宽(mm)', '厚(mm)', '原工位', '签收时间', '复核状态'],
+      ...reviewLog.map((record) => [
+        record.taskCode,
+        `${record.taskCode}-${record.pieceNo}`,
+        record.partName,
+        record.length,
+        record.width,
+        record.thickness,
+        record.workstation,
+        csvTime(record.signedAt),
+        record.reviewed ? '已复核' : '待复核',
+      ]),
+    );
+  }
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
+    .join('\n');
+  downloadBlob(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }), `${task.code}-开料进度单.csv`);
 }
 
 export function downloadPurchaseList(project: WoodworkingProject, result: NestingResult) {

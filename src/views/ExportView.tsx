@@ -19,11 +19,13 @@ import {
   Tr,
   useToast,
 } from '@chakra-ui/react';
-import { Download, FileDown, FileJson, FileText, Image, Upload } from 'lucide-react';
+import { Download, FileDown, FileJson, FileText, Image, Scissors, Upload } from 'lucide-react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { nestingResultAtom, projectAtom, selectedPartIdAtom } from '../stores/project';
+import { activeTaskAtom, activeTaskProgressAtom, reviewLogAtom } from '../stores/cutTasks';
 import {
   downloadCutList,
+  downloadCutProgress,
   downloadNestingSvg,
   downloadProject,
   downloadPurchaseList,
@@ -34,6 +36,9 @@ import { formatArea } from '../utils/nesting';
 export function ExportView() {
   const project = useAtomValue(projectAtom);
   const result = useAtomValue(nestingResultAtom);
+  const activeTask = useAtomValue(activeTaskAtom);
+  const cutProgress = useAtomValue(activeTaskProgressAtom);
+  const reviewLog = useAtomValue(reviewLogAtom);
   const setProject = useSetAtom(projectAtom);
   const setSelectedId = useSetAtom(selectedPartIdAtom);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,14 +64,26 @@ export function ExportView() {
   return (
     <main className="page-shell">
       <Box mb="14px">
-        <Text className="eyebrow">STEP 03 · 交付文件</Text>
+        <Text className="eyebrow">STEP 04 · 交付文件</Text>
         <Text className="page-title">切割清单与采购说明</Text>
         <Text className="page-desc">零件和连接变更已同步到清单及排料结果，可分别交给开料工、采购人员和安装现场。</Text>
       </Box>
 
-      <SimpleGrid columns={{ base: 1, md: 4 }} spacing="10px" mb="14px">
+      <SimpleGrid columns={{ base: 1, md: 3, xl: 5 }} spacing="10px" mb="14px">
         <ExportCard icon={<FileText />} title="零件表" description="尺寸、数量、材质、纹理和封边要求" action="导出 CSV" onClick={() => downloadCutList(project)} />
         <ExportCard icon={<Image />} title="排料图" description={`${result.sheetCount} 张板 · 利用率 ${result.utilization.toFixed(1)}%`} action="导出 SVG" onClick={() => downloadNestingSvg(project, result)} />
+        <ExportCard
+          icon={<Scissors />}
+          title="开料进度单"
+          description={
+            activeTask && cutProgress
+              ? `${activeTask.code} · 已切 ${cutProgress.cut} · 待切 ${cutProgress.pending} · 差异 ${cutProgress.diff}`
+              : '暂无进行中的开料任务'
+          }
+          action="导出 CSV"
+          disabled={!activeTask}
+          onClick={() => activeTask && downloadCutProgress(activeTask, reviewLog)}
+        />
         <ExportCard icon={<Download />} title="采购用料说明" description={`预计 ￥${result.purchaseCost.toFixed(0)} · 废料 ${formatArea(result.wasteArea)}`} action="导出 TXT" onClick={() => downloadPurchaseList(project, result)} />
         <ExportCard icon={<FileJson />} title="项目文件" description="保留全部零件、榫卯和板材参数" action="保存 JSON" onClick={() => downloadProject(project)} />
       </SimpleGrid>
@@ -119,6 +136,24 @@ export function ExportView() {
 
         <Stack spacing="12px">
           <Box borderWidth="1px" borderColor="slate.200" borderRadius="10px" bg="white" p="14px">
+            <Flex justify="space-between" align="center">
+              <Text fontSize="12px" fontWeight="800">开料进度</Text>
+              {activeTask && <Badge colorScheme="teal" variant="subtle">{activeTask.code}</Badge>}
+            </Flex>
+            {activeTask && cutProgress ? (
+              <>
+                <HStack mt="10px" justify="space-between" fontSize="11px"><span>已切</span><b>{cutProgress.cut} 件</b></HStack>
+                <HStack mt="7px" justify="space-between" fontSize="11px"><span>待切</span><b>{cutProgress.pending} 件</b></HStack>
+                <HStack mt="7px" justify="space-between" fontSize="11px"><span>差异（未排入）</span><b>{cutProgress.diff} 件</b></HStack>
+                <HStack mt="7px" justify="space-between" fontSize="11px"><span>登记工位</span><b>{activeTask.workstation}</b></HStack>
+                <Text mt="9px" fontSize="9px" color="slate.500">与开料任务页、进度单导出共用同一份签收记录。</Text>
+              </>
+            ) : (
+              <Text mt="8px" fontSize="10px" color="slate.500">暂无进行中的开料任务，请在“开料任务”页发起并冻结排料版本。</Text>
+            )}
+          </Box>
+
+          <Box borderWidth="1px" borderColor="slate.200" borderRadius="10px" bg="white" p="14px">
             <Text fontSize="12px" fontWeight="800">项目文件</Text>
             <Text mt="5px" fontSize="10px" color="slate.500">载入 JSON 会替换当前编辑项目，浏览器中的自动保存也会同步更新。</Text>
             <input
@@ -162,12 +197,14 @@ function ExportCard({
   title,
   description,
   action,
+  disabled = false,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   action: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -175,7 +212,7 @@ function ExportCard({
       <Box color="teal.700" w="30px">{icon}</Box>
       <Text mt="9px" fontSize="12px" fontWeight="800">{title}</Text>
       <Text mt="4px" fontSize="10px" color="slate.500" minH="30px">{description}</Text>
-      <Button mt="9px" width="100%" size="xs" variant="outline" colorScheme="teal" onClick={onClick}>{action}</Button>
+      <Button mt="9px" width="100%" size="xs" variant="outline" colorScheme="teal" isDisabled={disabled} onClick={onClick}>{action}</Button>
     </Box>
   );
 }

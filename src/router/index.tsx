@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter } from 'react-router-dom';
 import App from '../App';
 import { DesignView } from '../views/DesignView';
 import { NestingView } from '../views/NestingView';
+import { CuttingView } from '../views/CuttingView';
 import { ExportView } from '../views/ExportView';
 
 export const router = createBrowserRouter([
@@ -12,6 +13,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/design" replace /> },
       { path: 'design', element: <DesignView /> },
       { path: 'nesting', element: <NestingView /> },
+      { path: 'cutting', element: <CuttingView /> },
       { path: 'export', element: <ExportView /> },
       { path: '*', element: <Navigate to="/design" replace /> },
     ],
