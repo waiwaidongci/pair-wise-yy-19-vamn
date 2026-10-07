@@ -99,3 +99,92 @@ export interface ManualPosition {
   rotated: boolean;
 }
 
+// 开料任务：发起时冻结排料版本并登记工位，签收记录按编号留存。
+export interface FrozenPart {
+  id: string;
+  name: string;
+  stockId: string;
+  length: number;
+  width: number;
+  thickness: number;
+  quantity: number;
+}
+
+export interface FrozenStock {
+  id: string;
+  name: string;
+  material: string;
+  length: number;
+  width: number;
+  thickness: number;
+  price: number;
+}
+
+export interface FrozenPlacement {
+  key: string;
+  partId: string;
+  instance: number;
+  partName: string;
+  stockId: string;
+  stockName: string;
+  sheetIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotated: boolean;
+  nominalLength: number;
+  nominalWidth: number;
+  nominalThickness: number;
+}
+
+export interface SignOffRecord {
+  key: string;
+  partId: string;
+  instance: number;
+  workstation: string;
+  signedAt: number;
+  actualLength: number | null;
+  actualWidth: number | null;
+  actualThickness: number | null;
+  note: string;
+  contested: boolean;
+}
+
+export type CuttingTaskStatus = 'active' | 'review' | 'closed';
+
+export interface CuttingTask {
+  id: string;
+  version: number;
+  projectId: string;
+  workstation: string;
+  createdAt: number;
+  frozenAt: number;
+  kerf: number;
+  trim: number;
+  parts: FrozenPart[];
+  stocks: FrozenStock[];
+  placements: FrozenPlacement[];
+  signOffs: Record<string, SignOffRecord>;
+  status: CuttingTaskStatus;
+  supersedes: string | null;
+  supersededBy: string | null;
+}
+
+export interface CuttingTasksState {
+  activeId: string | null;
+  tasks: Record<string, CuttingTask>;
+  nextVersion: number;
+}
+
+export interface QueuedSignOff {
+  taskId: string;
+  key: string;
+  workstation: string;
+  actualLength: number | null;
+  actualWidth: number | null;
+  actualThickness: number | null;
+  note: string;
+  at: number;
+}
+

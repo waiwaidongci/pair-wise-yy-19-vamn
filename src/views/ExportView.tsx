@@ -22,8 +22,10 @@ import {
 import { Download, FileDown, FileJson, FileText, Image, Upload } from 'lucide-react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { nestingResultAtom, projectAtom, selectedPartIdAtom } from '../stores/project';
+import { activeTaskAtom, activeTaskProgressAtom } from '../stores/cuttingTask';
 import {
   downloadCutList,
+  downloadDeliveryList,
   downloadNestingSvg,
   downloadProject,
   downloadPurchaseList,
@@ -34,6 +36,8 @@ import { formatArea } from '../utils/nesting';
 export function ExportView() {
   const project = useAtomValue(projectAtom);
   const result = useAtomValue(nestingResultAtom);
+  const task = useAtomValue(activeTaskAtom);
+  const progress = useAtomValue(activeTaskProgressAtom);
   const setProject = useSetAtom(projectAtom);
   const setSelectedId = useSetAtom(selectedPartIdAtom);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,6 +72,13 @@ export function ExportView() {
         <ExportCard icon={<FileText />} title="零件表" description="尺寸、数量、材质、纹理和封边要求" action="导出 CSV" onClick={() => downloadCutList(project)} />
         <ExportCard icon={<Image />} title="排料图" description={`${result.sheetCount} 张板 · 利用率 ${result.utilization.toFixed(1)}%`} action="导出 SVG" onClick={() => downloadNestingSvg(project, result)} />
         <ExportCard icon={<Download />} title="采购用料说明" description={`预计 ￥${result.purchaseCost.toFixed(0)} · 废料 ${formatArea(result.wasteArea)}`} action="导出 TXT" onClick={() => downloadPurchaseList(project, result)} />
+        <ExportCard
+          icon={<FileJson />}
+          title="交付清单"
+          description={`已切 ${progress.cut} · 待切 ${progress.pending} · 差异 ${progress.variance}`}
+          action="导出 CSV"
+          onClick={() => downloadDeliveryList(project, task)}
+        />
         <ExportCard icon={<FileJson />} title="项目文件" description="保留全部零件、榫卯和板材参数" action="保存 JSON" onClick={() => downloadProject(project)} />
       </SimpleGrid>
 
@@ -130,6 +141,33 @@ export function ExportView() {
             />
             <Button mt="12px" width="100%" variant="outline" leftIcon={<Upload size={15} />} isLoading={loading} onClick={() => fileRef.current?.click()}>
               载入项目文件
+            </Button>
+          </Box>
+
+          <Box borderWidth="1px" borderColor="slate.200" borderRadius="10px" bg="white" p="14px">
+            <HStack mb="10px"><FileDown size={16} /><Text fontSize="12px" fontWeight="800">开料交付</Text></HStack>
+            <Text fontSize="10px" color="slate.500" mb="9px">已切、待切、差异数量与开料任务页面共用同一份记录。</Text>
+            <SimpleGrid columns={3} spacing="8px">
+              <Box textAlign="center" bg="green.50" borderRadius="8px" py="8px">
+                <Text fontSize="18px" fontWeight="900" color="green.700">{progress.cut}</Text>
+                <Text fontSize="9px" color="slate.500">已切</Text>
+              </Box>
+              <Box textAlign="center" bg="blue.50" borderRadius="8px" py="8px">
+                <Text fontSize="18px" fontWeight="900" color="blue.700">{progress.pending}</Text>
+                <Text fontSize="9px" color="slate.500">待切</Text>
+              </Box>
+              <Box textAlign="center" bg={progress.variance ? 'orange.50' : 'slate.50'} borderRadius="8px" py="8px">
+                <Text fontSize="18px" fontWeight="900" color={progress.variance ? 'orange.700' : 'slate.500'}>{progress.variance}</Text>
+                <Text fontSize="9px" color="slate.500">差异</Text>
+              </Box>
+            </SimpleGrid>
+            {task && (
+              <Text mt="9px" fontSize="9px" color="slate.500">
+                任务 {task.id} · v{task.version} · {task.workstation}
+              </Text>
+            )}
+            <Button mt="10px" width="100%" size="xs" variant="outline" colorScheme="teal" leftIcon={<Download size={13} />} onClick={() => downloadDeliveryList(project, task)}>
+              导出交付清单 CSV
             </Button>
           </Box>
 

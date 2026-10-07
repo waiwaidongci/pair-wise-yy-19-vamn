@@ -1,5 +1,6 @@
-import type { NestingResult, WoodworkingProject } from '../types/woodworking';
+import type { CuttingTask, NestingResult, WoodworkingProject } from '../types/woodworking';
 import { formatArea } from './nesting';
+import { taskProgress } from './cuttingTask';
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -104,5 +105,45 @@ export function downloadNestingSvg(project: WoodworkingProject, result: NestingR
     ${pieces.join('\n')}
   </svg>`;
   downloadBlob(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }), `${project.name}-排料图.svg`);
+}
+
+// 交付清单：已切、待切、差异数量与页面共用同一份记录（taskProgress）。
+export function downloadDeliveryList(project: WoodworkingProject, task: CuttingTask | null) {
+  const progress = taskProgress(task);
+  const varianceSet = new Set(progress.varianceKeys);
+  const placementRows = task
+    ? task.placements.map((placement) => {
+        const record = task.signOffs[placement.key];
+        return [
+          placement.key,
+          placement.partName,
+          placement.instance + 1,
+          placement.stockName,
+          placement.sheetIndex + 1,
+          placement.nominalLength,
+          placement.nominalWidth,
+          placement.nominalThickness,
+          record?.actualLength ?? '',
+          record?.actualWidth ?? '',
+          record?.actualThickness ?? '',
+          record ? '已切' : '待切',
+          record?.workstation ?? '',
+          record ? new Date(record.signedAt).toLocaleString() : '',
+          record ? (varianceSet.has(placement.key) ? '是' : '否') : '',
+          record?.note ?? '',
+        ];
+      })
+    : [];
+  const rows: (string | number)[][] = [
+    ['任务编号', task?.id ?? '无', '版本', task ? `v${task.version}` : '-', '登记工位', task?.workstation ?? '-'],
+    ['已切', progress.cut, '待切', progress.pending, '差异', progress.variance],
+    [],
+    ['编号', '零件', '序号', '板材', '张号', '名义长', '名义宽', '名义厚', '实际长', '实际宽', '实际厚', '状态', '签收工位', '签收时间', '差异', '备注'],
+    ...placementRows,
+  ];
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
+    .join('\n');
+  downloadBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }), `${project.name}-交付清单.csv`);
 }
 
